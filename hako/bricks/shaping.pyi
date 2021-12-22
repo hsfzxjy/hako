@@ -13,7 +13,7 @@ class ShapeNode(t.NamedTuple):
 
 SHAPENODE_PLACEHOLDER: ShapeNode
 
-PartialHierarchy = Hierarchy = t.Sequence[ShapeNode]
+PartialHierarchy = Hierarchy = t.Tuple[ShapeNode, ...]
 
 def create_hierarchy(
     obj,
@@ -21,4 +21,5 @@ def create_hierarchy(
     t.Tuple[PartialHierarchy, t.Literal[False]],
     t.Tuple[Hierarchy, t.Literal[True]],
 ]: ...
+def create_hierarchy_nocheck(obj) -> Hierarchy: ...
 def guess_hierarchy(val, depth: int) -> Hierarchy: ...

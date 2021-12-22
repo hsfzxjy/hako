@@ -5,31 +5,39 @@ import dataclasses
 import typing as t
 
 from hako import boxes
-from hako.bricks.shaping import Hierarchy, create_hierarchy
+from hako.bricks.shaping import Hierarchy, create_hierarchy_nocheck
 
 
-class HierarchyWrapper(list):
-    __slots__ = ("is_outermost",)
+class HierarchyWrapper:
+    __slots__ = ("is_outermost", "_tup")
 
-    def __sub__(self, rhs) -> "HierarchyWrapper":
-        self.append(ShapeNode.new(rhs))
-        return self
+    def __init__(self, obj):
+        self._tup = tuple(obj)
+
+    def __iter__(self):
+        return iter(self._tup)
+
+    def __getitem__(self, index):
+        return self._tup[index]
 
     @property
     def is_empty(self) -> bool:
-        return not self
+        return not self._tup
 
     def head(self) -> "ShapeNode":
-        return self[0]
+        return self._tup[0]
 
     def tail(self) -> "Hierarchy":
-        ret = self.new(self[1:])
+        ret = self.new(self._tup[1:])
         ret.is_outermost = False
         return ret
 
     @classmethod
     def new(cls, obj) -> "HierarchyWrapper":
-        ret = cls(create_hierarchy(obj)[0])
+        if obj.__class__ is cls:
+            return obj
+        obj = tuple(obj)
+        ret = cls(create_hierarchy_nocheck(obj))
         ret.is_outermost = True
         return ret
 

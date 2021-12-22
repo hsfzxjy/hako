@@ -1,8 +1,7 @@
 import pytest
 
 from hako import boxes as b
-from hako.boxes.dict import VariadicDict
-from hako.bricks.shaping import SHAPENODE_PLACEHOLDER, create_hierarchy
+from hako.bricks.shaping import SHAPENODE_PLACEHOLDER, create_hierarchy_nocheck
 
 PARAMETERS = [
     [
@@ -10,7 +9,7 @@ PARAMETERS = [
         [b.Tuple[None]],
     ],
     [
-        [tuple],
+        (tuple,),
         [b.Tuple[None]],
     ],
     [
@@ -71,4 +70,4 @@ PARAMETERS = [
 
 @pytest.mark.parametrize("expr, result", PARAMETERS)
 def test_arithemics(expr, result):
-    assert create_hierarchy(expr)[0] == result
+    assert create_hierarchy_nocheck(expr) == tuple(result)

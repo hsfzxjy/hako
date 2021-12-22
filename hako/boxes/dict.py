@@ -8,7 +8,7 @@ class Dict(BoxBase):
         if arg is None:
             return VariadicDict, arg
         elif arg.__class__ in {tuple, list}:
-            arg = list(arg)
+            arg = tuple(arg)
             return MultiItemsDict, arg
         else:
             return SingleItemDict, arg

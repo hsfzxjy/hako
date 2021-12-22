@@ -9,7 +9,7 @@ from ._hyper_parameters import N_TEST_TIMES
 
 
 HIERS = [
-    [boxes.List[None], boxes.Dict["foo"], boxes.Tuple[None]],
+    boxes.List - boxes.Dict["foo"] - boxes.Tuple,
 ]
 
 PARAMETERS = [

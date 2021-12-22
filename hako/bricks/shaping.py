@@ -22,13 +22,13 @@ class ShapeNode(
         return lhs._replace(target=self)
 
     def __sub__(self, rhs) -> "Hierarchy":
-        return [self, rhs]
+        return (self, rhs)
 
     def __rsub__(self, lhs) -> "Hierarchy":
-        if lhs.__class__ is list:
-            lhs.append(self)
+        if lhs.__class__ is tuple:
+            lhs += (self,)
             return lhs
-        return [lhs, self]
+        return (lhs, self)
 
     def __repr__(self) -> str:
         repr_string = f"{self.boxtype.__name__}[{self.mdata!r}]"
@@ -61,7 +61,7 @@ SHAPENODE_PLACEHOLDER = ShapeNode(None, None, None, None)
 
 from hako.boxes._registries import CLASS2BOXTYPE_MAPPING
 
-PartialHierarchy = Hierarchy = t.Sequence[ShapeNode]
+PartialHierarchy = Hierarchy = t.Tuple[ShapeNode, ...]
 
 
 def create_hierarchy(obj):
@@ -71,9 +71,9 @@ def create_hierarchy(obj):
         or isinstance(obj, type)
         and obj in CLASS2BOXTYPE_MAPPING
     ):
-        obj = [obj]
+        obj = (obj,)
 
-    if not isinstance(obj, Sequence):
+    if obj.__class__ is not tuple:
         raise TypeError
 
     ret = []
@@ -83,7 +83,22 @@ def create_hierarchy(obj):
             determined = False
         x = ShapeNode.new(x)
         ret.append(x)
-    return ret, determined
+    return tuple(ret), determined
+
+
+def create_hierarchy_nocheck(obj):
+    if (
+        isinstance(obj, (BoxBaseMeta, ShapeNode))
+        or obj is ...
+        or isinstance(obj, type)
+        and obj in CLASS2BOXTYPE_MAPPING
+    ):
+        obj = (obj,)
+
+    if obj.__class__ is not tuple:
+        raise TypeError
+
+    return tuple(map(ShapeNode.new, obj))
 
 
 def guess_hierarchy(
@@ -111,4 +126,4 @@ def guess_hierarchy(
                 boxtype = CLASS2BOXTYPE_MAPPING[class_]
                 node = boxtype.__guess__(val)._replace(target=node.target)
             val = boxtype.__pick_element__(val)
-    return hier
+    return tuple(hier)

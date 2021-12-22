@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 
 from hako import boxes, operators as ops
-from hako.bricks.shaping import create_hierarchy, Hierarchy
+from hako.bricks.shaping import Hierarchy, create_hierarchy_nocheck
 from hako.boxes.dict import MultiItemsDict, SingleItemDict, VariadicDict
 from hako.testing.generator import HierarchyWrapper
 
@@ -13,7 +13,7 @@ from ._hyper_parameters import N_TEST_TIMES, HIER_CANDIDATES
 
 
 def build_value(hier: HierarchyWrapper, arr: np.ndarray, mdatas: t.Sequence):
-    if not hier:
+    if hier.is_empty:
         return arr
     head = hier.head()
     tail = hier.tail()
@@ -67,7 +67,7 @@ def build_test_pair(
 
 PARAMETERS = []
 for hier in HIER_CANDIDATES:
-    hier, _ = create_hierarchy(hier)
+    hier = create_hierarchy_nocheck(hier)
     for times in range(N_TEST_TIMES):
         for perm in list(permutations(range(len(hier)))):
             for check in [True, False]:
