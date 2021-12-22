@@ -1,10 +1,12 @@
 import re
+import sys
 from textwrap import dedent
 from typing import Callable
 
 from hako.codegen.snippets import CODE_INDENT_1
 from hako.codegen.magic import make_func
 from hako.bricks.shaping import guess_hierarchy, create_hierarchy
+from . import cachelib
 
 
 def reindent(code: str, level: int, strip: bool = True):
@@ -42,14 +44,21 @@ class OperatorBase:
         self._pre_check = pre_check_snip
         self.__post_init__(kwargs)
 
-    def _snip_get_func(self, call_args=""):
+    def _snip_get_func(self):
         ...
+
+    def _snip_data_cache_key(self) -> str:
+        entries = ["hier"]
+        if self._guessable:
+            entries.append("depth")
+        entries.append(self._extra_operator_args)
+        return f'({self._name!r}, {", ".join(entries)})'
 
     def _snip_body(self):
         snip_get_func = self._snip_get_func()
-        snip_get_func_with_args = self._snip_get_func("(*args)")
+        snip_data_cache_key = self._snip_data_cache_key()
         if self._guessable:
-            snip_body = """
+            snip_body = f"""
             if hier is not None:
                 if depth is not None:
                     raise TypeError("expect depth to be None when hier given")
@@ -57,35 +66,48 @@ class OperatorBase:
                 hier, determined = create_hierarchy(hier)
             else:
                 determined = False
-                
+
+            data_cache_key = {snip_data_cache_key}
+            hit = cache_get(data_cache_key)
+            if hit:
+                return hit
+
             if determined:
-                {get_func_level_1}
+                {{get_func_level_1}}
             else:
-                def _func(*args):
+                def func_ret(*args):
                     example = args[value_arg_idx]
                     hier = guess_hierarchy(example, depth)
-                    {get_func_with_args_level_2}
+                    data_cache_key = {snip_data_cache_key}
+                    hit = cache_get(data_cache_key)
+                    if hit:
+                        return hit
+                    {{get_func_level_2}}
+                    cache_set(data_cache_key, func_ret)
+                    return func_ret(*args)
 
-                return _func
+            data_cache_key = {snip_data_cache_key}
+            cache_set(data_cache_key, func_ret)
+            return func_ret
             """
         else:
-            snip_body = """
+            snip_body = f"""
             hier, determined = create_hierarchy(hier)
+
+            data_cache_key = {snip_data_cache_key}
+            hit = cache_get(data_cache_key)
+            if hit:
+                return hit
+
             if not determined:
                 raise ValueError("hier should not contain placeholder `...`")
-            {get_func_level_0}
+            {{get_func_level_0}}
+            cache_set(data_cache_key, func_ret)
+            return func_ret
             """
 
         ret = dedent(snip_body).format_map(
-            {
-                **{
-                    f"get_func_level_{i}": reindent(snip_get_func, level=i)
-                    for i in range(2)
-                },
-                "get_func_with_args_level_2": reindent(
-                    snip_get_func_with_args, level=2
-                ),
-            }
+            {f"get_func_level_{i}": reindent(snip_get_func, level=i) for i in range(3)}
         )
         return ret
 
@@ -106,6 +128,9 @@ class OperatorBase:
             create_hierarchy=create_hierarchy,
             guess_hierarchy=guess_hierarchy,
             value_arg_idx=self._value_arg_idx,
+            cache_get=cachelib.cache_get,
+            cache_set=cachelib.cache_set,
+            getframe=sys._getframe,
         )
         objects.update(self._get_extra_constants())
         objects.update(self._extra_constants)
@@ -139,11 +164,11 @@ class SimpleOperator(OperatorBase):
         self._build_func = f
         return f
 
-    def _snip_get_func(self, call_args=""):
+    def _snip_get_func(self):
         snip = f"""
-        return build_func(hier, {self._extra_operator_args}){call_args}
+        func_ret = build_func(hier, {self._extra_operator_args})
         """
-        return dedent(snip)
+        return snip
 
     def _get_extra_constants(self):
         return dict(
@@ -165,7 +190,7 @@ class VariadicOperator(OperatorBase):
         self._build_func_multi_arg = f
         return f
 
-    def _snip_get_func(self, call_args=""):
+    def _snip_get_func(self):
         extra_args = self._extra_operator_args
         snip = f"""
         func_single_arg = build_func_single_arg(hier, {extra_args})
@@ -173,17 +198,16 @@ class VariadicOperator(OperatorBase):
 
         if ninputs is not None:
             if ninputs == 1:
-                return func_single_arg{call_args}
+                func_ret = func_single_arg
             else:
-                return func_multi_arg{call_args}
-
-        def _func(*args):
-            if len(args) > value_arg_idx + 1:
-                return func_multi_arg(*args)
-            else:
-                return func_single_arg(*args)
-
-        return _func{call_args}
+                func_ret = func_multi_arg
+        else:
+            nargs_threshold = value_arg_idx + 1
+            def func_ret(*args):
+                if len(args) > nargs_threshold:
+                    return func_multi_arg(*args)
+                else:
+                    return func_single_arg(*args)
         """
         return snip
 
