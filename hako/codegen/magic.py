@@ -1,6 +1,5 @@
 import typing as t
 from random import Random
-from types import FunctionType
 from linecache import lazycache
 
 from hako.misc.functional import zip_strict
@@ -23,6 +22,7 @@ _BUILTIN_CONSTANTS: t.Dict[str, t.Any] = dict(
     any=any,
     enumerate=enumerate,
     BoxMismatched=BoxMismatched,
+    __builtins__={},
 )
 
 
@@ -56,5 +56,5 @@ def make_func(name, func_sig, func_body, constants):
     lazycache(filename, {"__name__": filename, "__loader__": _FakeLoader(source)})
 
     code = compile(source, filename, "exec")
-    FunctionType(code, constants)()
+    exec(code, constants)
     return constants["__WRAPPER__"]()
